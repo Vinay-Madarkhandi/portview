@@ -1,5 +1,4 @@
-# Binary
-portview
+# Binary (root-level only, don't ignore cmd/portview/)
 /portview
 
 # Release artifacts
