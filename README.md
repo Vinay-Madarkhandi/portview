@@ -1,8 +1,13 @@
 # ⚡ PortView
 
+[![CI](https://github.com/Vinay-Madarkhandi/portview/actions/workflows/ci.yml/badge.svg)](https://github.com/Vinay-Madarkhandi/portview/actions/workflows/ci.yml)
+[![Release](https://github.com/Vinay-Madarkhandi/portview/actions/workflows/release.yml/badge.svg)](https://github.com/Vinay-Madarkhandi/portview/releases/latest)
+
 A sleek, real-time terminal UI for monitoring listening ports and their processes on Linux.
 
 Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Gloss](https://github.com/charmbracelet/lipgloss) for a polished TUI experience.
+
+---
 
 ## Features
 
@@ -16,37 +21,69 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Glo
 - 🛡️ **Robust error handling** — graceful handling of missing PIDs, permissions, and command failures
 - 🐧 **TCP & UDP** — monitors both TCP (LISTEN) and UDP (UNCONN) sockets
 
-## Requirements
-
-- **Linux** (uses the `ss` command from `iproute2`)
-- **Go 1.22+** (for building)
-- Run with `sudo` for full process information (PID and process names)
+---
 
 ## Installation
 
-### From source
+### Quick Install (recommended)
 
 ```bash
-git clone https://github.com/yourusername/portview.git
+curl -sSL https://raw.githubusercontent.com/Vinay-Madarkhandi/portview/main/install.sh | bash
+```
+
+This will:
+- Detect your OS (Linux/macOS) and architecture (amd64/arm64)
+- Download the correct prebuilt binary from the latest release
+- Install it to `/usr/local/bin` (or `~/.local/bin` if sudo is unavailable)
+
+### Go Install
+
+If you have Go installed:
+
+```bash
+go install github.com/Vinay-Madarkhandi/portview/cmd/portview@latest
+```
+
+### Manual Download
+
+Download the binary for your platform from the [latest release](https://github.com/Vinay-Madarkhandi/portview/releases/latest):
+
+| Platform              | Binary                  |
+|-----------------------|-------------------------|
+| Linux (x86_64)        | `portview-linux-amd64`  |
+| Linux (ARM64)         | `portview-linux-arm64`  |
+| macOS (Intel)         | `portview-darwin-amd64` |
+| macOS (Apple Silicon) | `portview-darwin-arm64` |
+
+```bash
+# Example: Linux x86_64
+curl -Lo portview https://github.com/Vinay-Madarkhandi/portview/releases/latest/download/portview-linux-amd64
+chmod +x portview
+sudo mv portview /usr/local/bin/
+```
+
+### Build from Source
+
+```bash
+git clone https://github.com/Vinay-Madarkhandi/portview.git
 cd portview
-go build -o portview ./cmd/portview/
+make build
+sudo mv portview /usr/local/bin/
 ```
 
-### Go install
-
-```bash
-go install github.com/yourusername/portview/cmd/portview@latest
-```
+---
 
 ## Usage
 
 ```bash
 # Basic usage (may not show all process names without root)
-./portview
+portview
 
 # Recommended: run with sudo for full process info
-sudo ./portview
+sudo portview
 ```
+
+---
 
 ## Key Bindings
 
@@ -59,13 +96,22 @@ sudo ./portview
 | `s`       | Cycle sort mode                 |
 | `q`       | Quit                            |
 
+---
+
+## Requirements
+
+- **Linux** — uses the `ss` command from `iproute2`
+- **macOS** — partial support (port scanning via `ss` requires iproute2mac)
+- Run with **`sudo`** for full process information (PID and process names)
+
+---
+
 ## Project Structure
 
 ```
 portview/
-├── cmd/
-│   └── portview/
-│       └── main.go              # Entry point
+├── cmd/portview/
+│   └── main.go                  # Entry point
 ├── internal/
 │   ├── scanner/
 │   │   ├── scanner.go           # Port scanning (ss command execution)
@@ -77,10 +123,17 @@ portview/
 │   │   └── keys.go              # Key binding definitions
 │   └── types/
 │       └── port.go              # PortInfo data type
+├── .github/workflows/
+│   ├── ci.yml                   # CI: test + vet on push/PR
+│   └── release.yml              # Release: build + upload on tag
+├── install.sh                   # One-line installer script
+├── Makefile                     # Build, test, release targets
 ├── go.mod
 ├── go.sum
 └── README.md
 ```
+
+---
 
 ## How It Works
 
@@ -89,6 +142,38 @@ portview/
 3. Results are displayed in a navigable table with automatic periodic refresh
 4. Users can kill processes directly from the UI
 
+---
+
+## Development
+
+```bash
+# Run tests
+make test
+
+# Run go vet
+make vet
+
+# Format code
+make fmt
+
+# Build for current platform
+make build
+
+# Cross-compile release binaries (outputs to dist/)
+make release
+```
+
+### Creating a Release
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The [release workflow](.github/workflows/release.yml) will automatically build binaries for all platforms and create a GitHub Release.
+
+---
+
 ## Future Improvements
 
 - [ ] Filter ports by protocol (TCP/UDP toggle)
@@ -96,10 +181,15 @@ portview/
 - [ ] Copy port or PID to clipboard
 - [ ] Export to JSON/CSV
 - [ ] Configuration file for custom refresh intervals
-- [ ] macOS support (via `lsof` or `netstat`)
+- [ ] macOS native support (via `lsof` or `netstat`)
 - [ ] Color theme customization
 - [ ] Confirmation dialog before killing a process
 
+---
+
+## License
+
+MIT
 
 ## Acknowledgments
 

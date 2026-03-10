@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"portview/internal/types"
+	"github.com/Vinay-Madarkhandi/portview/internal/types"
 )
 
 func ParseSSOutput(output string) []types.PortInfo {

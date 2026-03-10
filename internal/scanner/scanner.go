@@ -8,7 +8,7 @@ import (
 	"strings"
 	"syscall"
 
-	"portview/internal/types"
+	"github.com/Vinay-Madarkhandi/portview/internal/types"
 )
 
 func ScanPorts() ([]types.PortInfo, error) {

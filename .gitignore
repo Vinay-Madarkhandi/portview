@@ -2,6 +2,9 @@
 portview
 /portview
 
+# Release artifacts
+dist/
+
 # IDE
 .idea/
 .vscode/

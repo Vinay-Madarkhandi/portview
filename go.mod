@@ -1,4 +1,4 @@
-module portview
+module github.com/Vinay-Madarkhandi/portview
 
 go 1.25.5
 

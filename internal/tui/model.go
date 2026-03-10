@@ -13,8 +13,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"portview/internal/scanner"
-	"portview/internal/types"
+	"github.com/Vinay-Madarkhandi/portview/internal/scanner"
+	"github.com/Vinay-Madarkhandi/portview/internal/types"
 )
 
 const (
