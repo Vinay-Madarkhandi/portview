@@ -3,7 +3,7 @@
 [![CI](https://github.com/Vinay-Madarkhandi/portview/actions/workflows/ci.yml/badge.svg)](https://github.com/Vinay-Madarkhandi/portview/actions/workflows/ci.yml)
 [![Release](https://github.com/Vinay-Madarkhandi/portview/actions/workflows/release.yml/badge.svg)](https://github.com/Vinay-Madarkhandi/portview/releases/latest)
 
-A sleek, real-time terminal UI for monitoring listening ports and their processes on Linux.
+A sleek, real-time terminal UI for monitoring listening ports and their processes on Linux and macOS.
 
 Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Gloss](https://github.com/charmbracelet/lipgloss) for a polished TUI experience.
 
@@ -19,7 +19,8 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Glo
 - 🎨 **Styled UI** — color-highlighted header, selected row, and help bar
 - 📐 **Responsive layout** — adapts to terminal width and height
 - 🛡️ **Robust error handling** — graceful handling of missing PIDs, permissions, and command failures
-- 🐧 **TCP & UDP** — monitors both TCP (LISTEN) and UDP (UNCONN) sockets
+- 🐧 **Linux support** — uses `ss` from `iproute2` for TCP/UDP socket discovery
+- 🍎 **macOS support** — uses native `lsof` for TCP/UDP socket discovery
 
 ---
 
@@ -101,7 +102,7 @@ sudo portview
 ## Requirements
 
 - **Linux** — uses the `ss` command from `iproute2`
-- **macOS** — partial support (port scanning via `ss` requires iproute2mac)
+- **macOS** — uses the built-in `lsof` command
 - Run with **`sudo`** for full process information (PID and process names)
 
 ---
@@ -114,8 +115,8 @@ portview/
 │   └── main.go                  # Entry point
 ├── internal/
 │   ├── scanner/
-│   │   ├── scanner.go           # Port scanning (ss command execution)
-│   │   ├── parser.go            # ss output parsing logic
+│   │   ├── scanner.go           # OS-specific port scanner command execution
+│   │   ├── parser.go            # ss/lsof output parsing logic
 │   │   └── parser_test.go       # Parser unit tests
 │   ├── tui/
 │   │   ├── model.go             # Bubble Tea model (Update/View/Init)
@@ -137,7 +138,7 @@ portview/
 
 ## How It Works
 
-1. PortView executes `ss -tulpnH` to list all listening TCP and UDP sockets
+1. PortView executes `ss -tulpnH` on Linux or `lsof` on macOS to list listening TCP and UDP sockets
 2. The output is parsed into structured `PortInfo` records
 3. Results are displayed in a navigable table with automatic periodic refresh
 4. Users can kill processes directly from the UI
@@ -181,7 +182,6 @@ The [release workflow](.github/workflows/release.yml) will automatically build b
 - [ ] Copy port or PID to clipboard
 - [ ] Export to JSON/CSV
 - [ ] Configuration file for custom refresh intervals
-- [ ] macOS native support (via `lsof` or `netstat`)
 - [ ] Color theme customization
 - [ ] Confirmation dialog before killing a process
 
@@ -196,4 +196,3 @@ MIT
 - [Bubble Tea](https://github.com/charmbracelet/bubbletea) — TUI framework
 - [Bubbles](https://github.com/charmbracelet/bubbles) — TUI components
 - [Lip Gloss](https://github.com/charmbracelet/lipgloss) — Style definitions
-

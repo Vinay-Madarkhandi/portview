@@ -45,6 +45,59 @@ func ParseSSOutput(output string) []types.PortInfo {
 	return ports
 }
 
+func ParseLsofOutput(output string) []types.PortInfo {
+	var ports []types.PortInfo
+
+	currentPID := 0
+	currentProcess := "unknown"
+	currentProtocol := ""
+
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		prefix := line[0]
+		value := ""
+		if len(line) > 1 {
+			value = line[1:]
+		}
+
+		switch prefix {
+		case 'p':
+			currentPID = parseInt(value)
+			currentProcess = "unknown"
+			currentProtocol = ""
+		case 'c':
+			if value != "" {
+				currentProcess = value
+			}
+		case 'P':
+			currentProtocol = strings.ToLower(value)
+		case 'n':
+			if currentProtocol != "tcp" && currentProtocol != "udp" {
+				continue
+			}
+
+			address, port := parseLsofName(value)
+			if port == 0 {
+				continue
+			}
+
+			ports = append(ports, types.PortInfo{
+				Protocol: currentProtocol,
+				Port:     port,
+				Address:  address,
+				Process:  currentProcess,
+				PID:      currentPID,
+			})
+		}
+	}
+
+	return ports
+}
+
 func isListeningState(protocol, state string) bool {
 	switch protocol {
 	case "tcp":
@@ -78,6 +131,26 @@ func parseAddress(localAddr string) (string, int) {
 	return address, port
 }
 
+func parseLsofName(name string) (string, int) {
+	name = strings.TrimSpace(name)
+	if idx := strings.Index(name, " ("); idx >= 0 {
+		name = strings.TrimSpace(name[:idx])
+	}
+	if idx := strings.Index(name, "->"); idx >= 0 {
+		name = strings.TrimSpace(name[:idx])
+	}
+
+	fields := strings.Fields(name)
+	if len(fields) > 1 {
+		first := strings.ToLower(fields[0])
+		if first == "tcp" || first == "udp" {
+			name = fields[1]
+		}
+	}
+
+	return parseAddress(name)
+}
+
 func parseProcessInfo(fields []string) (string, int) {
 	process := "unknown"
 	pid := 0
@@ -95,6 +168,14 @@ func parseProcessInfo(fields []string) (string, int) {
 	process = extractProcessName(usersField)
 
 	return process, pid
+}
+
+func parseInt(value string) int {
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 func extractPID(usersField string) int {

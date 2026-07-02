@@ -56,6 +56,93 @@ func TestParseSSOutput_UDP(t *testing.T) {
 	}
 }
 
+func TestParseLsofOutput_TCPAndUDP(t *testing.T) {
+	input := `p1234
+cpython3
+PTCP
+n*:8000
+p567
+cmDNSResponder
+PUDP
+n*:5353`
+
+	ports := ParseLsofOutput(input)
+
+	if len(ports) != 2 {
+		t.Fatalf("expected 2 ports, got %d", len(ports))
+	}
+
+	tcp := ports[0]
+	if tcp.Protocol != "tcp" {
+		t.Errorf("expected protocol tcp, got %s", tcp.Protocol)
+	}
+	if tcp.Port != 8000 {
+		t.Errorf("expected port 8000, got %d", tcp.Port)
+	}
+	if tcp.Address != "*" {
+		t.Errorf("expected address *, got %s", tcp.Address)
+	}
+	if tcp.Process != "python3" {
+		t.Errorf("expected process python3, got %s", tcp.Process)
+	}
+	if tcp.PID != 1234 {
+		t.Errorf("expected PID 1234, got %d", tcp.PID)
+	}
+
+	udp := ports[1]
+	if udp.Protocol != "udp" {
+		t.Errorf("expected protocol udp, got %s", udp.Protocol)
+	}
+	if udp.Port != 5353 {
+		t.Errorf("expected port 5353, got %d", udp.Port)
+	}
+	if udp.Process != "mDNSResponder" {
+		t.Errorf("expected process mDNSResponder, got %s", udp.Process)
+	}
+	if udp.PID != 567 {
+		t.Errorf("expected PID 567, got %d", udp.PID)
+	}
+}
+
+func TestParseLsofOutput_IPv6AndDecoratedNames(t *testing.T) {
+	input := `p42
+cnginx
+PTCP
+nTCP [::1]:443 (LISTEN)
+p43
+cnode
+PTCP
+n127.0.0.1:3000->127.0.0.1:51234`
+
+	ports := ParseLsofOutput(input)
+
+	if len(ports) != 2 {
+		t.Fatalf("expected 2 ports, got %d", len(ports))
+	}
+
+	if ports[0].Address != "::1" || ports[0].Port != 443 {
+		t.Errorf("expected IPv6 listener (::1, 443), got (%q, %d)", ports[0].Address, ports[0].Port)
+	}
+	if ports[1].Address != "127.0.0.1" || ports[1].Port != 3000 {
+		t.Errorf("expected local endpoint (127.0.0.1, 3000), got (%q, %d)", ports[1].Address, ports[1].Port)
+	}
+}
+
+func TestParseLsofOutput_SkipsUnknownProtocolAndBadPorts(t *testing.T) {
+	input := `p1
+cproc
+n*:1234
+p2
+cproc
+PTCP
+n*:notaport`
+
+	ports := ParseLsofOutput(input)
+	if len(ports) != 0 {
+		t.Errorf("expected 0 ports, got %d", len(ports))
+	}
+}
+
 func TestParseSSOutput_NoProcessInfo(t *testing.T) {
 	input := `tcp   LISTEN 0      128          0.0.0.0:8080      0.0.0.0:*`
 
