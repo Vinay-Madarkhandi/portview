@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"encoding/csv"
 	"strconv"
 	"strings"
 
@@ -98,6 +99,48 @@ func ParseLsofOutput(output string) []types.PortInfo {
 	return ports
 }
 
+func ParsePowerShellCSVOutput(output string) []types.PortInfo {
+	output = strings.TrimSpace(output)
+	if output == "" {
+		return nil
+	}
+
+	reader := csv.NewReader(strings.NewReader(output))
+	records, err := reader.ReadAll()
+	if err != nil || len(records) < 2 {
+		return nil
+	}
+
+	index := csvHeaderIndex(records[0])
+	var ports []types.PortInfo
+	for _, record := range records[1:] {
+		protocol := strings.ToLower(csvField(record, index, "protocol"))
+		if protocol != "tcp" && protocol != "udp" {
+			continue
+		}
+
+		port := parseInt(csvField(record, index, "port"))
+		if port == 0 {
+			continue
+		}
+
+		process := csvField(record, index, "process")
+		if process == "" {
+			process = "unknown"
+		}
+
+		ports = append(ports, types.PortInfo{
+			Protocol: protocol,
+			Port:     port,
+			Address:  csvField(record, index, "address"),
+			Process:  process,
+			PID:      parseInt(csvField(record, index, "pid")),
+		})
+	}
+
+	return ports
+}
+
 func isListeningState(protocol, state string) bool {
 	switch protocol {
 	case "tcp":
@@ -151,6 +194,22 @@ func parseLsofName(name string) (string, int) {
 	return parseAddress(name)
 }
 
+func csvHeaderIndex(header []string) map[string]int {
+	index := make(map[string]int, len(header))
+	for i, name := range header {
+		index[strings.ToLower(strings.TrimSpace(name))] = i
+	}
+	return index
+}
+
+func csvField(record []string, index map[string]int, name string) string {
+	i, ok := index[name]
+	if !ok || i < 0 || i >= len(record) {
+		return ""
+	}
+	return strings.TrimSpace(record[i])
+}
+
 func parseProcessInfo(fields []string) (string, int) {
 	process := "unknown"
 	pid := 0
@@ -171,6 +230,7 @@ func parseProcessInfo(fields []string) (string, int) {
 }
 
 func parseInt(value string) int {
+	value = strings.TrimSpace(value)
 	n, err := strconv.Atoi(value)
 	if err != nil {
 		return 0

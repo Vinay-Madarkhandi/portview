@@ -28,7 +28,8 @@ detect_os() {
     case "$(uname -s)" in
         Linux*)  echo "linux"  ;;
         Darwin*) echo "darwin" ;;
-        *)       err "Unsupported operating system: $(uname -s). PortView supports Linux and macOS." ;;
+        MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
+        *)       err "Unsupported operating system: $(uname -s). PortView supports Linux, macOS, and Windows." ;;
     esac
 }
 
@@ -45,7 +46,10 @@ detect_arch() {
 # --- Determine install directory ---
 
 detect_install_dir() {
-    if [ -w /usr/local/bin ]; then
+    if [ "${OS}" = "windows" ]; then
+        mkdir -p "${HOME}/.local/bin"
+        echo "${HOME}/.local/bin"
+    elif [ -w /usr/local/bin ]; then
         echo "/usr/local/bin"
     elif command -v sudo > /dev/null 2>&1; then
         echo "/usr/local/bin"
@@ -70,6 +74,11 @@ main() {
     INSTALL_DIR=$(detect_install_dir)
 
     ASSET="${BINARY}-${OS}-${ARCH}"
+    TARGET="${BINARY}"
+    if [ "${OS}" = "windows" ]; then
+        ASSET="${ASSET}.exe"
+        TARGET="${BINARY}.exe"
+    fi
     DOWNLOAD_URL="${RELEASES_URL}/${ASSET}"
 
     info "Detected: ${OS}/${ARCH}"
@@ -78,27 +87,31 @@ main() {
     TMPDIR=$(mktemp -d)
     trap 'rm -rf "${TMPDIR}"' EXIT
 
-    HTTP_CODE=$(curl -sL -o "${TMPDIR}/${BINARY}" -w "%{http_code}" "${DOWNLOAD_URL}")
+    HTTP_CODE=$(curl -sL -o "${TMPDIR}/${TARGET}" -w "%{http_code}" "${DOWNLOAD_URL}")
 
     if [ "${HTTP_CODE}" != "200" ]; then
         err "Download failed (HTTP ${HTTP_CODE}). Check that a release exists for ${OS}/${ARCH} at:\n  ${DOWNLOAD_URL}"
     fi
 
-    chmod +x "${TMPDIR}/${BINARY}"
+    chmod +x "${TMPDIR}/${TARGET}"
 
-    info "Installing to ${INSTALL_DIR}/${BINARY}..."
+    info "Installing to ${INSTALL_DIR}/${TARGET}..."
 
     if [ "${INSTALL_DIR}" = "/usr/local/bin" ] && [ ! -w /usr/local/bin ]; then
-        sudo mv "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
+        sudo mv "${TMPDIR}/${TARGET}" "${INSTALL_DIR}/${TARGET}"
     else
-        mv "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
+        mv "${TMPDIR}/${TARGET}" "${INSTALL_DIR}/${TARGET}"
     fi
 
     ok "PortView installed successfully!"
     echo ""
     info "Run it with:"
-    echo "    ${BINARY}"
-    echo "    sudo ${BINARY}   # recommended, for full process info"
+    echo "    ${TARGET}"
+    if [ "${OS}" != "windows" ]; then
+        echo "    sudo ${BINARY}   # recommended, for full process info"
+    else
+        echo "    Run as Administrator for full process info"
+    fi
     echo ""
 
     # Warn if install dir is not in PATH
@@ -114,4 +127,3 @@ main() {
 }
 
 main
-

@@ -3,7 +3,7 @@
 [![CI](https://github.com/Vinay-Madarkhandi/portview/actions/workflows/ci.yml/badge.svg)](https://github.com/Vinay-Madarkhandi/portview/actions/workflows/ci.yml)
 [![Release](https://github.com/Vinay-Madarkhandi/portview/actions/workflows/release.yml/badge.svg)](https://github.com/Vinay-Madarkhandi/portview/releases/latest)
 
-A sleek, real-time terminal UI for monitoring listening ports and their processes on Linux and macOS.
+A sleek, real-time terminal UI for monitoring listening ports and their processes on Linux, macOS, and Windows.
 
 Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Gloss](https://github.com/charmbracelet/lipgloss) for a polished TUI experience.
 
@@ -14,13 +14,14 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Glo
 - 📊 **Structured table view** — protocol, port, address, process name, and PID
 - 🔄 **Auto-refresh** — updates every 3 seconds automatically
 - ⌨️ **Manual refresh** — press `r` to refresh immediately
-- 🔪 **Kill processes** — press `K` (shift+K) to send SIGTERM to the selected process
+- 🔪 **Kill processes** — press `K` (shift+K) to terminate the selected process
 - 🔀 **Sortable** — cycle through sort modes (port, process, protocol, PID) with `s`
 - 🎨 **Styled UI** — color-highlighted header, selected row, and help bar
 - 📐 **Responsive layout** — adapts to terminal width and height
 - 🛡️ **Robust error handling** — graceful handling of missing PIDs, permissions, and command failures
 - 🐧 **Linux support** — uses `ss` from `iproute2` for TCP/UDP socket discovery
 - 🍎 **macOS support** — uses native `lsof` for TCP/UDP socket discovery
+- 🪟 **Windows support** — uses PowerShell networking cmdlets for TCP/UDP socket discovery
 
 ---
 
@@ -33,7 +34,7 @@ curl -sSL https://raw.githubusercontent.com/Vinay-Madarkhandi/portview/main/inst
 ```
 
 This will:
-- Detect your OS (Linux/macOS) and architecture (amd64/arm64)
+- Detect your OS (Linux/macOS/Windows) and architecture (amd64/arm64)
 - Download the correct prebuilt binary from the latest release
 - Install it to `/usr/local/bin` (or `~/.local/bin` if sudo is unavailable)
 
@@ -55,12 +56,17 @@ Download the binary for your platform from the [latest release](https://github.c
 | Linux (ARM64)         | `portview-linux-arm64`  |
 | macOS (Intel)         | `portview-darwin-amd64` |
 | macOS (Apple Silicon) | `portview-darwin-arm64` |
+| Windows (x86_64)      | `portview-windows-amd64.exe` |
+| Windows (ARM64)       | `portview-windows-arm64.exe` |
 
 ```bash
 # Example: Linux x86_64
 curl -Lo portview https://github.com/Vinay-Madarkhandi/portview/releases/latest/download/portview-linux-amd64
 chmod +x portview
 sudo mv portview /usr/local/bin/
+
+# Example: Windows x86_64 (PowerShell)
+iwr -OutFile portview.exe https://github.com/Vinay-Madarkhandi/portview/releases/latest/download/portview-windows-amd64.exe
 ```
 
 ### Build from Source
@@ -77,11 +83,13 @@ sudo mv portview /usr/local/bin/
 ## Usage
 
 ```bash
-# Basic usage (may not show all process names without root)
+# Basic usage (may not show all process names without elevated permissions)
 portview
 
-# Recommended: run with sudo for full process info
+# Linux/macOS: recommended for full process info
 sudo portview
+
+# Windows: run your terminal as Administrator for full process info
 ```
 
 ---
@@ -93,7 +101,7 @@ sudo portview
 | `↑` / `k` | Move selection up              |
 | `↓` / `j` | Move selection down            |
 | `r`       | Manual refresh                  |
-| `K`       | Kill selected process (SIGTERM) |
+| `K`       | Terminate selected process       |
 | `s`       | Cycle sort mode                 |
 | `q`       | Quit                            |
 
@@ -103,7 +111,8 @@ sudo portview
 
 - **Linux** — uses the `ss` command from `iproute2`
 - **macOS** — uses the built-in `lsof` command
-- Run with **`sudo`** for full process information (PID and process names)
+- **Windows** — uses PowerShell `Get-NetTCPConnection`, `Get-NetUDPEndpoint`, and `Get-Process`
+- Run with **`sudo`** on Linux/macOS or as **Administrator** on Windows for full process information
 
 ---
 
@@ -116,7 +125,7 @@ portview/
 ├── internal/
 │   ├── scanner/
 │   │   ├── scanner.go           # OS-specific port scanner command execution
-│   │   ├── parser.go            # ss/lsof output parsing logic
+│   │   ├── parser.go            # ss/lsof/PowerShell output parsing logic
 │   │   └── parser_test.go       # Parser unit tests
 │   ├── tui/
 │   │   ├── model.go             # Bubble Tea model (Update/View/Init)
@@ -138,7 +147,7 @@ portview/
 
 ## How It Works
 
-1. PortView executes `ss -tulpnH` on Linux or `lsof` on macOS to list listening TCP and UDP sockets
+1. PortView executes `ss -tulpnH` on Linux, `lsof` on macOS, or PowerShell networking cmdlets on Windows to list listening TCP and UDP sockets
 2. The output is parsed into structured `PortInfo` records
 3. Results are displayed in a navigable table with automatic periodic refresh
 4. Users can kill processes directly from the UI

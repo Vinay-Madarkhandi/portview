@@ -6,7 +6,7 @@ CMD      := ./cmd/portview
 VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS  := -s -w -X main.version=$(VERSION)
 
-PLATFORMS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
+PLATFORMS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
 
 .PHONY: all build clean test vet fmt lint release help
 
@@ -48,7 +48,9 @@ release: clean
 	@for platform in $(PLATFORMS); do \
 		os=$${platform%/*}; \
 		arch=$${platform#*/}; \
-		output="dist/$(BINARY)-$${os}-$${arch}"; \
+		ext=""; \
+		if [ "$${os}" = "windows" ]; then ext=".exe"; fi; \
+		output="dist/$(BINARY)-$${os}-$${arch}$${ext}"; \
 		echo "Building $${output}..."; \
 		GOOS=$${os} GOARCH=$${arch} go build -ldflags "$(LDFLAGS)" -o $${output} $(CMD); \
 	done
@@ -57,4 +59,3 @@ release: clean
 	@ls -lh dist/
 
 all: build
-

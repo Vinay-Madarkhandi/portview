@@ -143,6 +143,70 @@ n*:notaport`
 	}
 }
 
+func TestParsePowerShellCSVOutput_TCPAndUDP(t *testing.T) {
+	input := `"Protocol","Address","Port","Process","PID"
+"tcp","0.0.0.0","8080","nginx","1234"
+"udp","::","5353","mDNSResponder","567"`
+
+	ports := ParsePowerShellCSVOutput(input)
+
+	if len(ports) != 2 {
+		t.Fatalf("expected 2 ports, got %d", len(ports))
+	}
+
+	tcp := ports[0]
+	if tcp.Protocol != "tcp" {
+		t.Errorf("expected protocol tcp, got %s", tcp.Protocol)
+	}
+	if tcp.Port != 8080 {
+		t.Errorf("expected port 8080, got %d", tcp.Port)
+	}
+	if tcp.Address != "0.0.0.0" {
+		t.Errorf("expected address 0.0.0.0, got %s", tcp.Address)
+	}
+	if tcp.Process != "nginx" {
+		t.Errorf("expected process nginx, got %s", tcp.Process)
+	}
+	if tcp.PID != 1234 {
+		t.Errorf("expected PID 1234, got %d", tcp.PID)
+	}
+
+	udp := ports[1]
+	if udp.Protocol != "udp" {
+		t.Errorf("expected protocol udp, got %s", udp.Protocol)
+	}
+	if udp.Port != 5353 {
+		t.Errorf("expected port 5353, got %d", udp.Port)
+	}
+	if udp.Address != "::" {
+		t.Errorf("expected address ::, got %s", udp.Address)
+	}
+	if udp.Process != "mDNSResponder" {
+		t.Errorf("expected process mDNSResponder, got %s", udp.Process)
+	}
+	if udp.PID != 567 {
+		t.Errorf("expected PID 567, got %d", udp.PID)
+	}
+}
+
+func TestParsePowerShellCSVOutput_SkipsBadRows(t *testing.T) {
+	input := `"Protocol","Address","Port","Process","PID"
+"icmp","0.0.0.0","1","ping","10"
+"tcp","127.0.0.1","notaport","bad","11"`
+
+	ports := ParsePowerShellCSVOutput(input)
+	if len(ports) != 0 {
+		t.Errorf("expected 0 ports, got %d", len(ports))
+	}
+}
+
+func TestParsePowerShellCSVOutput_EmptyInput(t *testing.T) {
+	ports := ParsePowerShellCSVOutput("")
+	if len(ports) != 0 {
+		t.Errorf("expected 0 ports, got %d", len(ports))
+	}
+}
+
 func TestParseSSOutput_NoProcessInfo(t *testing.T) {
 	input := `tcp   LISTEN 0      128          0.0.0.0:8080      0.0.0.0:*`
 

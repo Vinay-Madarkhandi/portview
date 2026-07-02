@@ -242,7 +242,7 @@ func killSelected(selected table.Row) (string, tea.Cmd) {
 		return fmt.Sprintf("✗ %s", err.Error()), clearStatusAfter(3 * time.Second)
 	}
 
-	status := fmt.Sprintf("✓ Sent SIGTERM to PID %d (%s)", pid, selected[3])
+	status := fmt.Sprintf("✓ Requested termination for PID %d (%s)", pid, selected[3])
 
 	return status, tea.Batch(
 		clearStatusAfter(3*time.Second),
