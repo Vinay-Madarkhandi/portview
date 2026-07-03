@@ -84,6 +84,8 @@ type Model struct {
 	statusMsg string
 	sortBy    sortField
 	filter    protocolFilter
+	search    string
+	searching bool
 	ready     bool
 }
 
@@ -160,6 +162,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusMsg = ""
 
 	case tea.KeyMsg:
+		if m.searching {
+			return m.updateSearch(msg)
+		}
+
 		switch {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
@@ -187,6 +193,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.refreshRows()
 			m.statusMsg = fmt.Sprintf("Showing %s ports", m.filter)
 			cmds = append(cmds, clearStatusAfter(2*time.Second))
+
+		case key.Matches(msg, keys.Search):
+			m.searching = true
+			m.statusMsg = ""
 
 		default:
 			var cmd tea.Cmd
@@ -218,12 +228,23 @@ func (m Model) View() string {
 	b.WriteString(m.table.View())
 	b.WriteString("\n")
 
-	if m.statusMsg != "" {
+	if m.searching {
+		search := m.search
+		if search == "" {
+			search = "type process or port"
+		}
+		b.WriteString("  " + StatusStyle.Render("Search: "+search) + "\n")
+	} else if m.statusMsg != "" {
 		b.WriteString("  " + StatusStyle.Render(m.statusMsg) + "\n")
 	} else {
-		visibleCount := len(m.filteredPorts())
+		visible := m.filteredPorts()
+		visibleCount := len(visible)
 		totalCount := len(m.ports)
-		info := HelpDescStyle.Render(fmt.Sprintf("  %d/%d port(s) · filter %s · sorted by %s · auto-refresh %s", visibleCount, totalCount, m.filter, m.sortBy, refreshInterval))
+		searchInfo := ""
+		if m.search != "" {
+			searchInfo = fmt.Sprintf(" · search %q", m.search)
+		}
+		info := HelpDescStyle.Render(fmt.Sprintf("  %d/%d port(s) · filter %s%s · sorted by %s · auto-refresh %s", visibleCount, totalCount, m.filter, searchInfo, m.sortBy, refreshInterval))
 		b.WriteString(info + "\n")
 	}
 
@@ -284,6 +305,43 @@ func delayedScan(d time.Duration) tea.Cmd {
 	})
 }
 
+func (m Model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyCtrlC:
+		return m, tea.Quit
+	case tea.KeyEnter:
+		m.searching = false
+		if m.search == "" {
+			m.statusMsg = "Search cleared"
+		} else {
+			m.statusMsg = fmt.Sprintf("Searching %q", m.search)
+		}
+		return m, clearStatusAfter(2 * time.Second)
+	case tea.KeyEsc:
+		m.searching = false
+		m.search = ""
+		m.refreshRows()
+		m.statusMsg = "Search cleared"
+		return m, clearStatusAfter(2 * time.Second)
+	case tea.KeyBackspace, tea.KeyCtrlH:
+		if m.search != "" {
+			runes := []rune(m.search)
+			m.search = string(runes[:len(runes)-1])
+			m.refreshRows()
+		}
+	default:
+		if msg.String() == "/" && m.search == "" {
+			return m, nil
+		}
+		if len(msg.Runes) > 0 {
+			m.search += string(msg.Runes)
+			m.refreshRows()
+		}
+	}
+
+	return m, nil
+}
+
 func (m *Model) sortPorts() {
 	sort.SliceStable(m.ports, func(i, j int) bool {
 		switch m.sortBy {
@@ -304,18 +362,28 @@ func (m *Model) refreshRows() {
 }
 
 func (m Model) filteredPorts() []types.PortInfo {
-	if m.filter == filterAll {
+	search := strings.ToLower(strings.TrimSpace(m.search))
+	if m.filter == filterAll && search == "" {
 		return m.ports
 	}
 
 	protocol := m.filter.String()
 	filtered := make([]types.PortInfo, 0, len(m.ports))
 	for _, port := range m.ports {
-		if port.Protocol == protocol {
-			filtered = append(filtered, port)
+		if m.filter != filterAll && port.Protocol != protocol {
+			continue
 		}
+		if search != "" && !portMatchesSearch(port, search) {
+			continue
+		}
+		filtered = append(filtered, port)
 	}
 	return filtered
+}
+
+func portMatchesSearch(port types.PortInfo, search string) bool {
+	return strings.Contains(strings.ToLower(port.Process), search) ||
+		strings.Contains(strconv.Itoa(port.Port), search)
 }
 
 func defaultColumns(width int) []table.Column {
@@ -354,6 +422,7 @@ func renderHelpBar(width int) string {
 		{"K", "kill"},
 		{"s", "sort"},
 		{"f", "filter"},
+		{"/", "search"},
 		{"q", "quit"},
 	}
 

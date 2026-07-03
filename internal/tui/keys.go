@@ -9,6 +9,7 @@ type keyMap struct {
 	Kill    key.Binding
 	Sort    key.Binding
 	Filter  key.Binding
+	Search  key.Binding
 	Quit    key.Binding
 }
 
@@ -36,6 +37,10 @@ var keys = keyMap{
 	Filter: key.NewBinding(
 		key.WithKeys("f"),
 		key.WithHelp("f", "filter protocol"),
+	),
+	Search: key.NewBinding(
+		key.WithKeys("/"),
+		key.WithHelp("/", "search"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
