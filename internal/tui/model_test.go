@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"errors"
 	"testing"
 
+	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Vinay-Madarkhandi/portview/internal/types"
@@ -90,5 +92,55 @@ func TestUpdateSearch(t *testing.T) {
 	}
 	if model.search != "" {
 		t.Fatalf("expected search to be cleared, got %q", model.search)
+	}
+}
+
+func TestCopySelectedValue(t *testing.T) {
+	originalCopyText := copyText
+	t.Cleanup(func() { copyText = originalCopyText })
+
+	var copied string
+	copyText = func(text string) error {
+		copied = text
+		return nil
+	}
+
+	status := copySelectedValue(table.Row{"TCP", "8080", "0.0.0.0", "nginx", "1234"}, 1, "port")
+	if copied != "8080" {
+		t.Fatalf("copied %q, want 8080", copied)
+	}
+	if status != "✓ Copied port 8080" {
+		t.Fatalf("status = %q", status)
+	}
+
+	status = copySelectedValue(table.Row{"TCP", "8080", "0.0.0.0", "nginx", "1234"}, 4, "PID")
+	if copied != "1234" {
+		t.Fatalf("copied %q, want 1234", copied)
+	}
+	if status != "✓ Copied PID 1234" {
+		t.Fatalf("status = %q", status)
+	}
+}
+
+func TestCopySelectedValueErrors(t *testing.T) {
+	originalCopyText := copyText
+	t.Cleanup(func() { copyText = originalCopyText })
+
+	status := copySelectedValue(nil, 1, "port")
+	if status != "No row selected" {
+		t.Fatalf("status = %q", status)
+	}
+
+	status = copySelectedValue(table.Row{"TCP", "8080", "0.0.0.0", "unknown", "-"}, 4, "PID")
+	if status != "No PID available for this port" {
+		t.Fatalf("status = %q", status)
+	}
+
+	copyText = func(text string) error {
+		return errors.New("clipboard unavailable")
+	}
+	status = copySelectedValue(table.Row{"TCP", "8080", "0.0.0.0", "nginx", "1234"}, 1, "port")
+	if status != "✗ Failed to copy port: clipboard unavailable" {
+		t.Fatalf("status = %q", status)
 	}
 }

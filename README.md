@@ -18,6 +18,7 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Glo
 - 🔀 **Sortable** — cycle through sort modes (port, process, protocol, PID) with `s`
 - 🔎 **Protocol filter** — cycle through all, TCP, and UDP ports with `f`
 - 🔍 **Search filter** — press `/` to filter by process name or port number
+- 📋 **Clipboard copy** — copy the selected port or PID from the table
 - 🎨 **Styled UI** — color-highlighted header, selected row, and help bar
 - 📐 **Responsive layout** — adapts to terminal width and height
 - 🛡️ **Robust error handling** — graceful handling of missing PIDs, permissions, and command failures
@@ -104,6 +105,8 @@ sudo portview
 | `↓` / `j` | Move selection down            |
 | `r`       | Manual refresh                  |
 | `K`       | Terminate selected process       |
+| `c`       | Copy selected port              |
+| `P`       | Copy selected PID               |
 | `s`       | Cycle sort mode                 |
 | `f`       | Cycle protocol filter           |
 | `/`       | Search process name or port     |
@@ -117,6 +120,7 @@ sudo portview
 - **Linux** — uses the `ss` command from `iproute2`
 - **macOS** — uses the built-in `lsof` command
 - **Windows** — uses PowerShell `Get-NetTCPConnection`, `Get-NetUDPEndpoint`, and `Get-Process`
+- **Clipboard on Linux** — uses `wl-copy`, `xclip`, or `xsel` when copying ports/PIDs
 - Run with **`sudo`** on Linux/macOS or as **Administrator** on Windows for full process information
 
 ---
@@ -191,7 +195,6 @@ The [release workflow](.github/workflows/release.yml) will automatically build b
 
 ## Future Improvements
 
-- [ ] Copy port or PID to clipboard
 - [ ] Export to JSON/CSV
 - [ ] Configuration file for custom refresh intervals
 - [ ] Color theme customization

@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/Vinay-Madarkhandi/portview/internal/clipboard"
 	"github.com/Vinay-Madarkhandi/portview/internal/scanner"
 	"github.com/Vinay-Madarkhandi/portview/internal/types"
 )
@@ -20,6 +21,8 @@ import (
 const (
 	refreshInterval = 3 * time.Second
 )
+
+var copyText = clipboard.Write
 
 type sortField int
 
@@ -181,6 +184,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, cmd)
 			}
 
+		case key.Matches(msg, keys.CopyPort):
+			m.statusMsg = copySelectedValue(m.table.SelectedRow(), 1, "port")
+			cmds = append(cmds, clearStatusAfter(2*time.Second))
+
+		case key.Matches(msg, keys.CopyPID):
+			m.statusMsg = copySelectedValue(m.table.SelectedRow(), 4, "PID")
+			cmds = append(cmds, clearStatusAfter(2*time.Second))
+
 		case key.Matches(msg, keys.Sort):
 			m.sortBy = (m.sortBy + 1) % sortFieldCount
 			m.sortPorts()
@@ -297,6 +308,25 @@ func killSelected(selected table.Row) (string, tea.Cmd) {
 		clearStatusAfter(3*time.Second),
 		delayedScan(500*time.Millisecond),
 	)
+}
+
+func copySelectedValue(selected table.Row, column int, label string) string {
+	if selected == nil {
+		return "No row selected"
+	}
+	if column < 0 || column >= len(selected) {
+		return fmt.Sprintf("No %s available", label)
+	}
+
+	value := strings.TrimSpace(selected[column])
+	if value == "" || value == "-" {
+		return fmt.Sprintf("No %s available for this port", label)
+	}
+
+	if err := copyText(value); err != nil {
+		return fmt.Sprintf("✗ Failed to copy %s: %v", label, err)
+	}
+	return fmt.Sprintf("✓ Copied %s %s", label, value)
 }
 
 func delayedScan(d time.Duration) tea.Cmd {
@@ -420,6 +450,8 @@ func renderHelpBar(width int) string {
 		{"↑/↓", "navigate"},
 		{"r", "refresh"},
 		{"K", "kill"},
+		{"c", "copy port"},
+		{"P", "copy PID"},
 		{"s", "sort"},
 		{"f", "filter"},
 		{"/", "search"},
