@@ -14,15 +14,18 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/Vinay-Madarkhandi/portview/internal/clipboard"
+	"github.com/Vinay-Madarkhandi/portview/internal/config"
+	"github.com/Vinay-Madarkhandi/portview/internal/exporter"
 	"github.com/Vinay-Madarkhandi/portview/internal/scanner"
 	"github.com/Vinay-Madarkhandi/portview/internal/types"
 )
 
 const (
-	refreshInterval = 3 * time.Second
+	defaultRefreshInterval = 3 * time.Second
 )
 
 var copyText = clipboard.Write
+var exportPorts = exporter.Export
 
 type sortField int
 
@@ -79,21 +82,35 @@ type scanResultMsg struct {
 type statusMsg string
 
 type Model struct {
-	table     table.Model
-	ports     []types.PortInfo
-	err       error
-	width     int
-	height    int
-	statusMsg string
-	sortBy    sortField
-	filter    protocolFilter
-	search    string
-	searching bool
-	ready     bool
+	table       table.Model
+	ports       []types.PortInfo
+	err         error
+	width       int
+	height      int
+	statusMsg   string
+	sortBy      sortField
+	filter      protocolFilter
+	search      string
+	searching   bool
+	pendingKill table.Row
+	interval    time.Duration
+	ready       bool
 }
 
 // InitialModel creates the initial application model.
 func InitialModel() Model {
+	cfg, err := config.Load()
+	m := initialModelWithConfig(cfg)
+	if err != nil {
+		m.statusMsg = fmt.Sprintf("Config: %v", err)
+	}
+	return m
+}
+
+func initialModelWithConfig(cfg config.Config) Model {
+	cfg.ApplyDefaults()
+	configureStyles(cfg)
+
 	columns := defaultColumns(80)
 	t := table.New(
 		table.WithColumns(columns),
@@ -105,26 +122,27 @@ func InitialModel() Model {
 	s := table.DefaultStyles()
 	s.Header = s.Header.
 		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("#7D56F4")).
+		BorderForeground(lipgloss.Color(currentPalette.accent)).
 		BorderBottom(true).
 		Bold(true).
-		Foreground(lipgloss.Color("#7D56F4"))
+		Foreground(lipgloss.Color(currentPalette.accent))
 	s.Selected = s.Selected.
-		Foreground(lipgloss.Color("#FAFAFA")).
-		Background(lipgloss.Color("#7D56F4")).
+		Foreground(lipgloss.Color(currentPalette.headerForeground)).
+		Background(lipgloss.Color(currentPalette.accent)).
 		Bold(true)
 	t.SetStyles(s)
 
 	return Model{
-		table:  t,
-		sortBy: sortByPort,
+		table:    t,
+		sortBy:   sortByPort,
+		interval: time.Duration(cfg.RefreshIntervalSeconds) * time.Second,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		doScan,
-		tickCmd(),
+		tickCmd(m.refreshInterval()),
 	)
 }
 
@@ -145,7 +163,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table.SetHeight(tableHeight)
 
 	case tickMsg:
-		cmds = append(cmds, doScan, tickCmd())
+		cmds = append(cmds, doScan, tickCmd(m.refreshInterval()))
 
 	case scanResultMsg:
 		if msg.err != nil {
@@ -168,6 +186,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.searching {
 			return m.updateSearch(msg)
 		}
+		if m.pendingKill != nil {
+			return m.updateKillConfirmation(msg)
+		}
 
 		switch {
 		case key.Matches(msg, keys.Quit):
@@ -178,10 +199,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, doScan, clearStatusAfter(1*time.Second))
 
 		case key.Matches(msg, keys.Kill):
-			statusText, cmd := killSelected(m.table.SelectedRow())
+			statusText, pending := requestKillConfirmation(m.table.SelectedRow())
 			m.statusMsg = statusText
-			if cmd != nil {
-				cmds = append(cmds, cmd)
+			m.pendingKill = pending
+			if pending == nil {
+				cmds = append(cmds, clearStatusAfter(2*time.Second))
 			}
 
 		case key.Matches(msg, keys.CopyPort):
@@ -191,6 +213,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.CopyPID):
 			m.statusMsg = copySelectedValue(m.table.SelectedRow(), 4, "PID")
 			cmds = append(cmds, clearStatusAfter(2*time.Second))
+
+		case key.Matches(msg, keys.ExportCSV):
+			m.statusMsg = exportVisible(exporter.FormatCSV, m.filteredPorts())
+			cmds = append(cmds, clearStatusAfter(3*time.Second))
+
+		case key.Matches(msg, keys.ExportJSON):
+			m.statusMsg = exportVisible(exporter.FormatJSON, m.filteredPorts())
+			cmds = append(cmds, clearStatusAfter(3*time.Second))
 
 		case key.Matches(msg, keys.Sort):
 			m.sortBy = (m.sortBy + 1) % sortFieldCount
@@ -255,7 +285,7 @@ func (m Model) View() string {
 		if m.search != "" {
 			searchInfo = fmt.Sprintf(" · search %q", m.search)
 		}
-		info := HelpDescStyle.Render(fmt.Sprintf("  %d/%d port(s) · filter %s%s · sorted by %s · auto-refresh %s", visibleCount, totalCount, m.filter, searchInfo, m.sortBy, refreshInterval))
+		info := HelpDescStyle.Render(fmt.Sprintf("  %d/%d port(s) · filter %s%s · sorted by %s · auto-refresh %s", visibleCount, totalCount, m.filter, searchInfo, m.sortBy, m.refreshInterval()))
 		b.WriteString(info + "\n")
 	}
 
@@ -264,10 +294,20 @@ func (m Model) View() string {
 	return b.String()
 }
 
-func tickCmd() tea.Cmd {
-	return tea.Tick(refreshInterval, func(t time.Time) tea.Msg {
+func tickCmd(interval time.Duration) tea.Cmd {
+	if interval <= 0 {
+		interval = defaultRefreshInterval
+	}
+	return tea.Tick(interval, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
+}
+
+func (m Model) refreshInterval() time.Duration {
+	if m.interval <= 0 {
+		return defaultRefreshInterval
+	}
+	return m.interval
 }
 
 func doScan() tea.Msg {
@@ -310,6 +350,41 @@ func killSelected(selected table.Row) (string, tea.Cmd) {
 	)
 }
 
+func requestKillConfirmation(selected table.Row) (string, table.Row) {
+	if selected == nil {
+		return "No row selected", nil
+	}
+
+	pidStr := selected[4]
+	if pidStr == "-" || pidStr == "" {
+		return "No PID available for this port", nil
+	}
+
+	if _, err := strconv.Atoi(pidStr); err != nil {
+		return fmt.Sprintf("Invalid PID: %s", pidStr), nil
+	}
+
+	return fmt.Sprintf("Kill PID %s (%s)? y/Enter confirm, n/Esc cancel", pidStr, selected[3]), selected
+}
+
+func (m Model) updateKillConfirmation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case msg.Type == tea.KeyCtrlC:
+		return m, tea.Quit
+	case msg.Type == tea.KeyEnter || strings.EqualFold(msg.String(), "y"):
+		statusText, cmd := killSelected(m.pendingKill)
+		m.pendingKill = nil
+		m.statusMsg = statusText
+		return m, cmd
+	case msg.Type == tea.KeyEsc || strings.EqualFold(msg.String(), "n"):
+		m.pendingKill = nil
+		m.statusMsg = "Kill cancelled"
+		return m, clearStatusAfter(2 * time.Second)
+	default:
+		return m, nil
+	}
+}
+
 func copySelectedValue(selected table.Row, column int, label string) string {
 	if selected == nil {
 		return "No row selected"
@@ -327,6 +402,14 @@ func copySelectedValue(selected table.Row, column int, label string) string {
 		return fmt.Sprintf("✗ Failed to copy %s: %v", label, err)
 	}
 	return fmt.Sprintf("✓ Copied %s %s", label, value)
+}
+
+func exportVisible(format exporter.Format, ports []types.PortInfo) string {
+	path, err := exportPorts(format, ports)
+	if err != nil {
+		return fmt.Sprintf("✗ Export failed: %v", err)
+	}
+	return fmt.Sprintf("✓ Exported %d port(s) to %s", len(ports), path)
 }
 
 func delayedScan(d time.Duration) tea.Cmd {
@@ -452,6 +535,8 @@ func renderHelpBar(width int) string {
 		{"K", "kill"},
 		{"c", "copy port"},
 		{"P", "copy PID"},
+		{"e", "CSV"},
+		{"E", "JSON"},
 		{"s", "sort"},
 		{"f", "filter"},
 		{"/", "search"},

@@ -3,16 +3,18 @@ package tui
 import "github.com/charmbracelet/bubbles/key"
 
 type keyMap struct {
-	Up       key.Binding
-	Down     key.Binding
-	Refresh  key.Binding
-	Kill     key.Binding
-	CopyPort key.Binding
-	CopyPID  key.Binding
-	Sort     key.Binding
-	Filter   key.Binding
-	Search   key.Binding
-	Quit     key.Binding
+	Up         key.Binding
+	Down       key.Binding
+	Refresh    key.Binding
+	Kill       key.Binding
+	CopyPort   key.Binding
+	CopyPID    key.Binding
+	ExportCSV  key.Binding
+	ExportJSON key.Binding
+	Sort       key.Binding
+	Filter     key.Binding
+	Search     key.Binding
+	Quit       key.Binding
 }
 
 var keys = keyMap{
@@ -39,6 +41,14 @@ var keys = keyMap{
 	CopyPID: key.NewBinding(
 		key.WithKeys("P"),
 		key.WithHelp("P", "copy PID"),
+	),
+	ExportCSV: key.NewBinding(
+		key.WithKeys("e"),
+		key.WithHelp("e", "export CSV"),
+	),
+	ExportJSON: key.NewBinding(
+		key.WithKeys("E"),
+		key.WithHelp("E", "export JSON"),
 	),
 	Sort: key.NewBinding(
 		key.WithKeys("s"),
