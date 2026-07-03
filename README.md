@@ -16,6 +16,7 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Glo
 - ⌨️ **Manual refresh** — press `r` to refresh immediately
 - 🔪 **Kill processes** — press `K` (shift+K) to terminate the selected process
 - 🔀 **Sortable** — cycle through sort modes (port, process, protocol, PID) with `s`
+- 🔎 **Protocol filter** — cycle through all, TCP, and UDP ports with `f`
 - 🎨 **Styled UI** — color-highlighted header, selected row, and help bar
 - 📐 **Responsive layout** — adapts to terminal width and height
 - 🛡️ **Robust error handling** — graceful handling of missing PIDs, permissions, and command failures
@@ -103,6 +104,7 @@ sudo portview
 | `r`       | Manual refresh                  |
 | `K`       | Terminate selected process       |
 | `s`       | Cycle sort mode                 |
+| `f`       | Cycle protocol filter           |
 | `q`       | Quit                            |
 
 ---
@@ -186,7 +188,6 @@ The [release workflow](.github/workflows/release.yml) will automatically build b
 
 ## Future Improvements
 
-- [ ] Filter ports by protocol (TCP/UDP toggle)
 - [ ] Search/filter by process name or port number
 - [ ] Copy port or PID to clipboard
 - [ ] Export to JSON/CSV

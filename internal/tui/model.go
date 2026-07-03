@@ -31,6 +31,15 @@ const (
 	sortFieldCount
 )
 
+type protocolFilter int
+
+const (
+	filterAll protocolFilter = iota
+	filterTCP
+	filterUDP
+	protocolFilterCount
+)
+
 func (s sortField) String() string {
 	switch s {
 	case sortByPort:
@@ -43,6 +52,17 @@ func (s sortField) String() string {
 		return "pid"
 	default:
 		return "port"
+	}
+}
+
+func (f protocolFilter) String() string {
+	switch f {
+	case filterTCP:
+		return "tcp"
+	case filterUDP:
+		return "udp"
+	default:
+		return "all"
 	}
 }
 
@@ -63,6 +83,7 @@ type Model struct {
 	height    int
 	statusMsg string
 	sortBy    sortField
+	filter    protocolFilter
 	ready     bool
 }
 
@@ -128,7 +149,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = nil
 			m.ports = msg.ports
 			m.sortPorts()
-			m.table.SetRows(portsToRows(m.ports))
+			m.refreshRows()
 		}
 
 	case statusMsg:
@@ -157,8 +178,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Sort):
 			m.sortBy = (m.sortBy + 1) % sortFieldCount
 			m.sortPorts()
-			m.table.SetRows(portsToRows(m.ports))
+			m.refreshRows()
 			m.statusMsg = fmt.Sprintf("Sorted by %s", m.sortBy)
+			cmds = append(cmds, clearStatusAfter(2*time.Second))
+
+		case key.Matches(msg, keys.Filter):
+			m.filter = (m.filter + 1) % protocolFilterCount
+			m.refreshRows()
+			m.statusMsg = fmt.Sprintf("Showing %s ports", m.filter)
 			cmds = append(cmds, clearStatusAfter(2*time.Second))
 
 		default:
@@ -194,8 +221,9 @@ func (m Model) View() string {
 	if m.statusMsg != "" {
 		b.WriteString("  " + StatusStyle.Render(m.statusMsg) + "\n")
 	} else {
-		portCount := len(m.ports)
-		info := HelpDescStyle.Render(fmt.Sprintf("  %d port(s) · sorted by %s · auto-refresh %s", portCount, m.sortBy, refreshInterval))
+		visibleCount := len(m.filteredPorts())
+		totalCount := len(m.ports)
+		info := HelpDescStyle.Render(fmt.Sprintf("  %d/%d port(s) · filter %s · sorted by %s · auto-refresh %s", visibleCount, totalCount, m.filter, m.sortBy, refreshInterval))
 		b.WriteString(info + "\n")
 	}
 
@@ -271,6 +299,25 @@ func (m *Model) sortPorts() {
 	})
 }
 
+func (m *Model) refreshRows() {
+	m.table.SetRows(portsToRows(m.filteredPorts()))
+}
+
+func (m Model) filteredPorts() []types.PortInfo {
+	if m.filter == filterAll {
+		return m.ports
+	}
+
+	protocol := m.filter.String()
+	filtered := make([]types.PortInfo, 0, len(m.ports))
+	for _, port := range m.ports {
+		if port.Protocol == protocol {
+			filtered = append(filtered, port)
+		}
+	}
+	return filtered
+}
+
 func defaultColumns(width int) []table.Column {
 	usable := width - 10
 	if usable < 50 {
@@ -306,6 +353,7 @@ func renderHelpBar(width int) string {
 		{"r", "refresh"},
 		{"K", "kill"},
 		{"s", "sort"},
+		{"f", "filter"},
 		{"q", "quit"},
 	}
 

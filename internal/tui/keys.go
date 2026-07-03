@@ -8,6 +8,7 @@ type keyMap struct {
 	Refresh key.Binding
 	Kill    key.Binding
 	Sort    key.Binding
+	Filter  key.Binding
 	Quit    key.Binding
 }
 
@@ -31,6 +32,10 @@ var keys = keyMap{
 	Sort: key.NewBinding(
 		key.WithKeys("s"),
 		key.WithHelp("s", "cycle sort"),
+	),
+	Filter: key.NewBinding(
+		key.WithKeys("f"),
+		key.WithHelp("f", "filter protocol"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
